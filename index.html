@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Esqueleto 3D interativo — parte inferior</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #14151a; color: #eceae2;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    overflow: hidden;
+  }
+  #canvas-wrap { position: absolute; inset: 0; }
+  canvas { display: block; }
+
+  #hint {
+    position: absolute; top: 16px; left: 16px;
+    font-size: 13px; color: #a6a49a;
+    background: rgba(20,21,26,0.7);
+    padding: 8px 12px; border-radius: 8px;
+    max-width: 220px; line-height: 1.5;
+    pointer-events: none;
+  }
+
+  #loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #a6a49a;
+  }
+
+  #info-panel {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #1c1d24;
+    border-top: 1px solid #33343c;
+    padding: 18px 20px 22px;
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    max-height: 45%;
+    overflow-y: auto;
+  }
+  #info-panel.open { transform: translateY(0); }
+  #info-title { font-size: 17px; font-weight: 600; margin: 0 0 8px; color: #f4f2ea; }
+  #info-fact { font-size: 14px; line-height: 1.65; margin: 0; color: #c7c5ba; }
+  #info-close {
+    position: absolute; top: 12px; right: 14px;
+    background: none; border: none; color: #a6a49a;
+    font-size: 20px; cursor: pointer; line-height: 1;
+    padding: 4px 8px;
+  }
+  #info-close:hover { color: #f4f2ea; }
+
+  #debug-toggle {
+    position: absolute; top: 16px; right: 16px;
+    font-size: 12px; color: #706f68;
+    background: rgba(20,21,26,0.7);
+    padding: 6px 10px; border-radius: 8px;
+    cursor: pointer; user-select: none;
+  }
+  #debug-readout {
+    position: absolute; top: 54px; right: 16px;
+    font-size: 11px; color: #7fd0a8;
+    background: rgba(20,21,26,0.85);
+    padding: 6px 10px; border-radius: 8px;
+    display: none; white-space: pre; font-family: monospace;
+  }
+
+  #credit {
+    position: absolute; bottom: 8px; right: 12px;
+    font-size: 10px; color: #55544e;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap"></div>
+<div id="loading">Carregando modelo 3D…</div>
+<div id="hint">Arraste para girar · scroll para zoom · clique em uma parte do esqueleto</div>
+<div id="debug-toggle" onclick="toggleDebug()">calibrar (d)</div>
+<div id="debug-readout"></div>
+
+<div id="info-panel">
+  <button id="info-close" onclick="closePanel()">×</button>
+  <p id="info-title"></p>
+  <p id="info-fact"></p>
+</div>
+
+<div id="credit">Modelo: "Male Skeleton" por LeoVitalis (Sketchfab) · CC BY 4.0</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---------- dados das partes: cada uma tem uma faixa vertical (fração da altura total),
+// e um lado ('left', 'right', 'both'). Ajuste os números em CALIBRACAO se necessário.
+const PARTS = [
+  {
+    id: 'quadril', name: 'Quadril (pelve)', side: 'both',
+    yFrom: 0.50, yTo: 0.62,
+    fact: 'O quadril é formado pela fusão de três ossos — ílio, ísquio e púbis — que se unem na infância. É a articulação que liga a coluna vertebral aos membros inferiores e sustenta praticamente todo o peso do corpo em pé.'
+  },
+  {
+    id: 'femur-esq', name: 'Fêmur (coxa) — esquerdo', side: 'left',
+    yFrom: 0.30, yTo: 0.50,
+    fact: 'O fêmur é o osso mais longo e mais resistente do corpo humano. É capaz de suportar até 30 vezes o peso corporal antes de fraturar.'
+  },
+  {
+    id: 'femur-dir', name: 'Fêmur (coxa) — direito', side: 'right',
+    yFrom: 0.30, yTo: 0.50,
+    fact: 'O fêmur é o osso mais longo e mais resistente do corpo humano. É capaz de suportar até 30 vezes o peso corporal antes de fraturar.'
+  },
+  {
+    id: 'joelho-esq', name: 'Joelho — esquerdo', side: 'left',
+    yFrom: 0.27, yTo: 0.31,
+    fact: 'O joelho é a maior articulação do corpo. A patela (rótula) que o protege é o maior osso sesamoide — um tipo de osso que se forma dentro de um tendão.'
+  },
+  {
+    id: 'joelho-dir', name: 'Joelho — direito', side: 'right',
+    yFrom: 0.27, yTo: 0.31,
+    fact: 'O joelho é a maior articulação do corpo. A patela (rótula) que o protege é o maior osso sesamoide — um tipo de osso que se forma dentro de um tendão.'
+  },
+  {
+    id: 'perna-esq', name: 'Tíbia e fíbula — esquerda', side: 'left',
+    yFrom: 0.06, yTo: 0.27,
+    fact: 'Abaixo do joelho ficam dois ossos: a tíbia, que sustenta a maior parte do peso do corpo, e a fíbula, mais fina, que ajuda a estabilizar o tornozelo.'
+  },
+  {
+    id: 'perna-dir', name: 'Tíbia e fíbula — direita', side: 'right',
+    yFrom: 0.06, yTo: 0.27,
+    fact: 'Abaixo do joelho ficam dois ossos: a tíbia, que sustenta a maior parte do peso do corpo, e a fíbula, mais fina, que ajuda a estabilizar o tornozelo.'
+  },
+  {
+    id: 'tornozelo-esq', name: 'Tornozelo — esquerdo', side: 'left',
+    yFrom: 0.03, yTo: 0.065,
+    fact: 'O tornozelo é formado principalmente por três ossos — tíbia, fíbula e tálus. É uma das articulações mais sujeitas a entorses no dia a dia.'
+  },
+  {
+    id: 'tornozelo-dir', name: 'Tornozelo — direito', side: 'right',
+    yFrom: 0.03, yTo: 0.065,
+    fact: 'O tornozelo é formado principalmente por três ossos — tíbia, fíbula e tálus. É uma das articulações mais sujeitas a entorses no dia a dia.'
+  },
+  {
+    id: 'pe-esq', name: 'Pé — esquerdo', side: 'left',
+    yFrom: 0.0, yTo: 0.035,
+    fact: 'Cada pé tem 26 ossos. Somando os dois pés, eles representam mais de um quarto de todos os ossos do corpo humano — além de 33 articulações e mais de 100 músculos, tendões e ligamentos.'
+  },
+  {
+    id: 'pe-dir', name: 'Pé — direito', side: 'right',
+    yFrom: 0.0, yTo: 0.035,
+    fact: 'Cada pé tem 26 ossos. Somando os dois pés, eles representam mais de um quarto de todos os ossos do corpo humano — além de 33 articulações e mais de 100 músculos, tendões e ligamentos.'
+  },
+  {
+    id: 'coluna-lombar', name: 'Coluna lombar', side: 'both',
+    yFrom: 0.58, yTo: 0.665,
+    fact: 'A coluna lombar tem 5 vértebras e sustenta a maior parte do peso da parte superior do corpo — por isso é a região mais comum de dores nas costas.'
+  },
+  {
+    id: 'caixa-toracica', name: 'Caixa torácica e coluna torácica', side: 'both',
+    yFrom: 0.665, yTo: 0.83,
+    fact: 'A caixa torácica é formada por 12 pares de costelas presas à coluna torácica e, na maioria dos casos, ao esterno na frente. Ela protege o coração e os pulmões.'
+  },
+  {
+    id: 'mao-esq', name: 'Mão — esquerda', side: 'left',
+    yFrom: 0.47, yTo: 0.545,
+    fact: 'Cada mão tem 27 ossos — mais do que qualquer outra parte do corpo em relação ao tamanho. Isso permite a incrível variedade de movimentos finos que os dedos conseguem fazer.'
+  },
+  {
+    id: 'mao-dir', name: 'Mão — direita', side: 'right',
+    yFrom: 0.47, yTo: 0.545,
+    fact: 'Cada mão tem 27 ossos — mais do que qualquer outra parte do corpo em relação ao tamanho. Isso permite a incrível variedade de movimentos finos que os dedos conseguem fazer.'
+  },
+  {
+    id: 'antebraco-esq', name: 'Antebraço (rádio e ulna) — esquerdo', side: 'left',
+    yFrom: 0.545, yTo: 0.68,
+    fact: 'O antebraço tem dois ossos, rádio e ulna, que giram um sobre o outro — é esse movimento que permite virar a palma da mão pra cima ou pra baixo (pronação e supinação).'
+  },
+  {
+    id: 'antebraco-dir', name: 'Antebraço (rádio e ulna) — direito', side: 'right',
+    yFrom: 0.545, yTo: 0.68,
+    fact: 'O antebraço tem dois ossos, rádio e ulna, que giram um sobre o outro — é esse movimento que permite virar a palma da mão pra cima ou pra baixo (pronação e supinação).'
+  },
+  {
+    id: 'braco-esq', name: 'Braço (úmero) — esquerdo', side: 'left',
+    yFrom: 0.68, yTo: 0.815,
+    fact: 'O úmero é o osso do braço e o terceiro mais longo do corpo. Seu extremo superior encaixa no ombro numa articulação esférica, a mais móvel do corpo humano.'
+  },
+  {
+    id: 'braco-dir', name: 'Braço (úmero) — direito', side: 'right',
+    yFrom: 0.68, yTo: 0.815,
+    fact: 'O úmero é o osso do braço e o terceiro mais longo do corpo. Seu extremo superior encaixa no ombro numa articulação esférica, a mais móvel do corpo humano.'
+  },
+  {
+    id: 'ombros', name: 'Ombros (clavícula e escápula)', side: 'both',
+    yFrom: 0.795, yTo: 0.845,
+    fact: 'A clavícula é o único osso longo do corpo que fica quase na horizontal, e é também o osso mais frequentemente fraturado — comum em quedas ou impactos no ombro.'
+  },
+  {
+    id: 'pescoco', name: 'Pescoço (vértebras cervicais)', side: 'both',
+    yFrom: 0.845, yTo: 0.885,
+    fact: 'O pescoço tem 7 vértebras cervicais — a mesma quantidade que uma girafa tem, só que muito maiores nela. É a região mais móvel da coluna.'
+  },
+  {
+    id: 'cranio', name: 'Crânio', side: 'both',
+    yFrom: 0.885, yTo: 1.0,
+    fact: 'O crânio de um adulto é formado por 22 ossos, a maioria unidos por articulações fixas chamadas suturas. Ao nascer, esses ossos ainda não estão totalmente fundidos, o que permite a passagem pelo canal do parto.'
+  },
+];
+
+// ---------- setup básico ----------
+const wrap = document.getElementById('canvas-wrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14151a);
+
+const camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 2000);
+camera.position.set(0, 100, 220);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+wrap.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 60, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 1.2);
+key.position.set(100, 200, 150);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+fill.position.set(-100, 50, -150);
+scene.add(fill);
+
+window.addEventListener('resize', () => {
+  camera.aspect = wrap.clientWidth / wrap.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+});
+
+// ---------- carregar modelo ----------
+const hitboxes = [];
+let debugMode = false;
+
+new GLTFLoader().load('./assets/scene.gltf', (gltf) => {
+  const model = gltf.scene;
+
+  // material neutro tipo osso, funciona sem texturas
+  model.traverse(o => {
+    if (o.isMesh) {
+      o.material = new THREE.MeshStandardMaterial({
+        color: 0xe8e2d0, roughness: 0.85, metalness: 0.05
+      });
+    }
+  });
+
+  scene.add(model);
+
+  const box = new THREE.Box3().setFromObject(model);
+  const minY = box.min.y, maxY = box.max.y, height = maxY - minY;
+  const minX = box.min.x, maxX = box.max.x, cx = (minX + maxX) / 2;
+  const minZ = box.min.z, maxZ = box.max.z;
+
+  // centraliza câmera no corpo inteiro
+  const midY = minY + height * 0.5;
+  controls.target.set(cx, midY, 0);
+  camera.position.set(cx + 10, midY + 20, height * 1.15);
+
+  // cria hitboxes invisíveis
+  const helperMat = new THREE.MeshBasicMaterial({
+    color: 0x7fd0a8, transparent: true, opacity: 0, wireframe: false
+  });
+
+  PARTS.forEach(part => {
+    const yFrom = minY + height * part.yFrom;
+    const yTo = minY + height * part.yFrom + (height * (part.yTo - part.yFrom));
+    let xFrom = minX, xTo = maxX;
+    if (part.side === 'left') { xFrom = cx; xTo = maxX; }
+    if (part.side === 'right') { xFrom = minX; xTo = cx; }
+
+    const w = xTo - xFrom;
+    const h = yTo - yFrom;
+    const d = (maxZ - minZ) * 1.4;
+
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, helperMat.clone());
+    mesh.position.set(xFrom + w / 2, yFrom + h / 2, (minZ + maxZ) / 2);
+    mesh.userData.part = part;
+    scene.add(mesh);
+    hitboxes.push(mesh);
+  });
+
+  document.getElementById('loading').style.display = 'none';
+}, undefined, (err) => {
+  document.getElementById('loading').textContent = 'Erro ao carregar o modelo — veja o console.';
+  console.error(err);
+});
+
+// ---------- interação por clique ----------
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+renderer.domElement.addEventListener('click', (e) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(hitboxes, false);
+
+  if (debugMode && hits.length) {
+    const p = hits[0].point;
+    document.getElementById('debug-readout').textContent =
+      `x: ${p.x.toFixed(1)}\ny: ${p.y.toFixed(1)}\nz: ${p.z.toFixed(1)}`;
+    return;
+  }
+
+  if (hits.length) {
+    const part = hits[0].object.userData.part;
+    openPanel(part.name, part.fact);
+  }
+});
+
+function openPanel(title, fact) {
+  document.getElementById('info-title').textContent = title;
+  document.getElementById('info-fact').textContent = fact;
+  document.getElementById('info-panel').classList.add('open');
+}
+window.closePanel = () => document.getElementById('info-panel').classList.remove('open');
+
+window.toggleDebug = () => {
+  debugMode = !debugMode;
+  document.getElementById('debug-readout').style.display = debugMode ? 'block' : 'none';
+};
+window.addEventListener('keydown', (e) => { if (e.key === 'd') window.toggleDebug(); });
+
+// ---------- loop ----------
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
