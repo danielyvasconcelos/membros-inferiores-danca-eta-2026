@@ -1,0 +1,24 @@
+{
+  "name": "membros-inferiores-danca-eta-2026",
+  "version": "1.0.0",
+  "description": "Visualizador 3D com duas abas — **Esqueleto** e **Músculos** — com partes clicáveis mostrando curiosidades, com foco no contexto da dança.",
+  "private": true,
+  "scripts": {
+    "compress-muscle-model": "gltf-transform meshopt assets/muscles/scene.gltf assets/muscles/scene-compressed.glb"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danielyvasconcelos/membros-inferiores-danca-eta-2026.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/danielyvasconcelos/membros-inferiores-danca-eta-2026/issues"
+  },
+  "homepage": "https://github.com/danielyvasconcelos/membros-inferiores-danca-eta-2026#readme",
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.4.2"
+  }
+}

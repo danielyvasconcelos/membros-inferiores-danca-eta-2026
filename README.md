@@ -21,20 +21,32 @@ Depois abra **http://localhost:8000** no navegador.
 ### Opção 2 — VS Code
 Instale a extensão **Live Server** e clique em "Go Live" com a pasta aberta.
 
-### Modelo de músculos (obrigatório rodar localmente antes de abrir a aba)
+### Modelo de músculos
 
-O modelo de músculos (~154MB) **não fica no repositório Git** — é grande
-demais para o GitHub (limite de 100MB por arquivo) e por isso está listado
-no `.gitignore`. Antes de abrir a aba "Músculos", coloque os arquivos aqui:
+O app carrega `assets/muscles/scene-compressed.glb` (~28MB, **versionado no
+Git** — é esse arquivo que vai pro deploy e funciona direto, sem passo
+manual nenhum).
 
+Esse arquivo é gerado a partir do modelo original "Myology" (~154MB, grande
+demais pro GitHub — limite de 100MB por arquivo), comprimido com
+[gltf-transform](https://gltf-transform.dev/) usando codificação **meshopt**
+— reduz o tamanho de geometria sem mesclar, simplificar ou remover nenhum
+dos 283 objetos/meshes (cada `Object_ID` do catálogo continua exatamente
+igual ao original).
+
+Se precisar regenerar o arquivo comprimido (ex.: baixou um novo `scene.gltf`
+do Myology, ou quer ajustar a qualidade):
+
+```bash
+npm install
+# copie scene.gltf + scene.bin do Myology pra assets/muscles/ primeiro
+npm run compress-muscle-model
 ```
-assets/muscles/scene.gltf
-assets/muscles/scene.bin
-assets/muscles/license.txt
-```
 
-(baixe o modelo "Myology" da Z-Anatomy no Sketchfab e copie os três
-arquivos pra essa pasta).
+Isso lê `assets/muscles/scene.gltf`/`scene.bin` (não versionados, ficam de
+fora do `.gitignore`) e escreve `assets/muscles/scene-compressed.glb`
+(versionado). Os arquivos brutos originais só são necessários pra rodar esse
+script — o app em si nunca carrega `scene.gltf` diretamente.
 
 ## Como usar
 - **Abas** no topo: alterna entre Esqueleto e Músculos. Cada modelo só é
@@ -60,7 +72,9 @@ arquivos pra essa pasta).
 ```
 /assets
   /skeleton   scene.gltf + scene.bin + license.txt (versionado, ~17MB)
-  /muscles    scene.gltf + scene.bin + license.txt (NÃO versionado, ~154MB)
+  /muscles    scene-compressed.glb + license.txt (versionado, ~28MB) —
+              scene.gltf/scene.bin originais (NÃO versionados, ~154MB) só
+              são necessários pra rodar `npm run compress-muscle-model`
 /src
   sharedViewer.js   câmera, luzes, controls, raycaster e painel de info —
                     compartilhados pelas duas abas

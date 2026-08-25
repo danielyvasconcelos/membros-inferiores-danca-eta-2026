@@ -8,5 +8,9 @@ miology (*)/
 
 # arquivos pesados do modelo de músculos usado em assets/muscles/
 # (154MB — acima do limite de 100MB do GitHub; mantenha license.txt versionado)
+# scene-compressed.glb (gerado por `npm run compress-muscle-model`, ~28MB)
+# É o que o app carrega de fato — esse sim fica versionado.
 assets/muscles/scene.bin
 assets/muscles/scene.gltf
+
+node_modules/
