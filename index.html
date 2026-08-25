@@ -49,10 +49,12 @@
     background: #1c1d24; border: 1px solid #33343c; border-radius: 10px;
     padding: 16px 20px;
     color: #eceae2; text-decoration: none;
-    font-size: 15px; font-weight: 600;
+    font-size: 15px; font-weight: 600; font-family: inherit; text-align: left;
+    cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
   }
   .content-link-btn:hover { background: #24252d; border-color: #7fd0a8; }
+  .content-link-btn--center { justify-content: center; text-align: center; }
   .content-link-btn .icon { font-size: 20px; }
   .content-link-btn .sub {
     display: block; font-size: 11px; font-weight: 400; color: #a6a49a; margin-top: 2px;
@@ -264,10 +266,12 @@
     <span class="icon">▶</span>
     <span>Performance da Tate McRae<span class="sub">abre no YouTube</span></span>
   </a>
-  <a class="content-link-btn" href="./assets/docs/shimmy-simples.pdf" target="_blank" rel="noopener noreferrer">
-    <span class="icon">📄</span>
+  <a class="content-link-btn content-link-btn--center" href="./assets/docs/shimmy-simples.pdf" target="_blank" rel="noopener noreferrer">
     <span>Shimmy Simples<span class="sub">abre o PDF</span></span>
   </a>
+  <button class="content-link-btn content-link-btn--center" id="pelvis-map-btn" type="button">
+    <span>Cintura pélvica e membros inferiores<span class="sub">ver mapa mental</span></span>
+  </button>
 </div>
 
 <div id="loading">
@@ -493,6 +497,10 @@ function openLightbox(src, alt) {
 function closeLightbox() {
   lightboxEl.classList.remove('open');
 }
+document.getElementById('pelvis-map-btn').addEventListener('click', () => {
+  openLightbox('./assets/images/cintura-pelvica-membros-inferiores.png', 'Mapa mental: danças ligadas à cintura pélvica e aos membros inferiores');
+});
+
 document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
 lightboxEl.addEventListener('click', (e) => {
   if (e.target === lightboxEl) closeLightbox();
