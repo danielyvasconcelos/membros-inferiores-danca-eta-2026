@@ -1,11 +1,18 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { MUSCLE_CATALOG } from './muscleCatalog.js';
 
 // Modelo "Myology" (Z-Anatomy): 283 nodes, cada estrutura anatômica já é um
 // mesh separado (sem hitbox necessária), mas os nomes são genéricos
 // (Object_2..Object_284) — a identificação vem do material (tipo de tecido)
 // e, quando catalogado, de MUSCLE_CATALOG.
+//
+// O arquivo original (scene.gltf, ~154MB) é grande demais pro GitHub — o que
+// se carrega aqui é assets/muscles/scene-compressed.glb (~28MB), gerado com
+// `npm run compress-muscle-model` (gltf-transform + compressão meshopt, sem
+// mesclar/simplificar meshes — só reduz o tamanho dos buffers de geometria,
+// preservando cada Object_ID igual ao original).
 
 // Cor de reserva só para o caso raro de faltar baseColorFactor no glTF —
 // os materiais originais (ex.: Muscles.001 ~ vermelho tecido) já vêm com cor.
@@ -29,7 +36,9 @@ const FALLBACK_COLORS = {
 
 export function loadMuscles(scene, onProgress) {
   return new Promise((resolve, reject) => {
-    new GLTFLoader().load('./assets/muscles/scene.gltf', (gltf) => {
+    const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    loader.load('./assets/muscles/scene-compressed.glb', (gltf) => {
       const model = gltf.scene;
       const meshes = [];
       const materialNames = new Set();
