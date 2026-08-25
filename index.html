@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Esqueleto 3D interativo — parte inferior</title>
+<title>Esqueleto e músculos 3D interativos</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -14,6 +14,49 @@
   }
   #canvas-wrap { position: absolute; inset: 0; }
   canvas { display: block; }
+
+  #tabs {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px;
+    background: rgba(20,21,26,0.85);
+    padding: 4px; border-radius: 10px;
+    border: 1px solid #33343c;
+    z-index: 5;
+  }
+  .tab-btn {
+    background: none; border: none; cursor: pointer;
+    color: #a6a49a; font-size: 13px; font-weight: 600;
+    padding: 8px 16px; border-radius: 7px;
+    font-family: inherit;
+  }
+  .tab-btn.active { background: #33343c; color: #f4f2ea; }
+  .tab-btn:hover:not(.active) { color: #d8d6cc; }
+
+  #content-panel {
+    display: none;
+    position: absolute; inset: 0;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px;
+    background: #14151a;
+    z-index: 3;
+  }
+  #content-panel h2 {
+    margin: 0 0 4px; font-size: 20px; color: #f4f2ea; font-weight: 700;
+  }
+  .content-link-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 280px;
+    background: #1c1d24; border: 1px solid #33343c; border-radius: 10px;
+    padding: 16px 20px;
+    color: #eceae2; text-decoration: none;
+    font-size: 15px; font-weight: 600;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .content-link-btn:hover { background: #24252d; border-color: #7fd0a8; }
+  .content-link-btn .icon { font-size: 20px; }
+  .content-link-btn .sub {
+    display: block; font-size: 11px; font-weight: 400; color: #a6a49a; margin-top: 2px;
+  }
 
   #hint {
     position: absolute; top: 16px; left: 16px;
@@ -26,9 +69,22 @@
 
   #loading {
     position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px;
     font-size: 14px; color: #a6a49a;
+    background: #14151a;
+    z-index: 10;
   }
+  #loading.hidden { display: none; }
+  #loading-bar-track {
+    width: 220px; height: 6px; border-radius: 3px;
+    background: #26272f; overflow: hidden;
+  }
+  #loading-bar-fill {
+    height: 100%; width: 0%; background: #7fd0a8;
+    transition: width 0.15s ease;
+  }
+  #loading-sub { font-size: 12px; color: #706f68; max-width: 260px; text-align: center; }
 
   #info-panel {
     position: absolute; bottom: 0; left: 0; right: 0;
@@ -58,36 +114,206 @@
     padding: 6px 10px; border-radius: 8px;
     cursor: pointer; user-select: none;
   }
+  #debug-toggle.active { color: #7fd0a8; }
   #debug-readout {
     position: absolute; top: 54px; right: 16px;
     font-size: 11px; color: #7fd0a8;
-    background: rgba(20,21,26,0.85);
-    padding: 6px 10px; border-radius: 8px;
+    background: rgba(20,21,26,0.9);
+    padding: 8px 10px; border-radius: 8px;
     display: none; white-space: pre; font-family: monospace;
+    max-width: 260px;
   }
+  #copy-object-id {
+    display: none; margin-top: 6px;
+    font-size: 11px; font-family: inherit;
+    background: #33343c; color: #eceae2; border: none;
+    padding: 4px 8px; border-radius: 5px; cursor: pointer;
+  }
+  #copy-object-id:hover { background: #40414b; }
+
+  #dance-cards {
+    position: absolute; top: 54px; right: 16px;
+    width: 260px;
+    max-height: calc(100vh - 140px);
+    display: flex; flex-direction: column; gap: 10px;
+    overflow-y: auto;
+    z-index: 4;
+  }
+  .dance-card, .dance-image-card {
+    background: rgba(28,29,36,0.95);
+    border: 1px solid #33343c;
+    border-radius: 10px;
+    padding: 12px 14px;
+    flex-shrink: 0;
+  }
+  .dance-image-card { padding: 10px; }
+  .dance-card-label, .dance-image-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #7fd0a8; font-weight: 700; margin: 0 0 6px;
+  }
+  .dance-card-text {
+    font-size: 13px; line-height: 1.55; color: #c7c5ba; margin: 0;
+  }
+  .dance-card-text + .dance-card-text { margin-top: 6px; }
+  .dance-card-text strong { color: #e5e3d8; }
+  .dance-image-card img {
+    display: block; width: 100%; border-radius: 6px;
+    background: #eceae2; cursor: zoom-in;
+  }
+  .dance-image-caption {
+    font-size: 11px; line-height: 1.4; color: #a6a49a;
+    margin: 8px 0 0;
+  }
+
+  .side-widget {
+    display: none;
+    position: absolute; top: 110px; left: 16px;
+    max-width: 200px;
+    z-index: 4;
+  }
+  .side-widget-toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    color: #a6a49a; background: rgba(20,21,26,0.85);
+    border: 1px solid #33343c; border-radius: 8px;
+    padding: 8px 10px; cursor: pointer;
+  }
+  .side-widget-toggle:hover { color: #d8d6cc; }
+  .side-widget-toggle-icon { font-size: 10px; transition: transform 0.15s ease; }
+  .side-widget-toggle.collapsed .side-widget-toggle-icon { transform: rotate(-90deg); }
+  .side-widget-panel {
+    display: block;
+    margin-top: 6px;
+    background: rgba(20,21,26,0.85);
+    border: 1px solid #33343c;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px; color: #c7c5ba;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .side-widget-panel.collapsed { display: none; }
+  .layer-quick-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .layer-quick-actions button {
+    font-size: 10px; font-family: inherit;
+    background: #33343c; color: #eceae2; border: none;
+    padding: 4px 6px; border-radius: 5px; cursor: pointer;
+  }
+  .layer-quick-actions button:hover { background: #40414b; }
+  .layer-check { display: block; margin: 3px 0; cursor: pointer; }
+  .layer-check input { margin-right: 6px; }
+  .layer-section-title {
+    margin: 10px 0 6px; padding-top: 8px;
+    border-top: 1px solid #33343c;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #a6a49a; font-weight: 600;
+  }
+  #muscle-group-buttons button.empty { opacity: 0.5; }
 
   #credit {
     position: absolute; bottom: 8px; right: 12px;
     font-size: 10px; color: #55544e;
+    line-height: 1.5; text-align: right;
     pointer-events: none;
   }
+
+  #lightbox {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(10,10,12,0.92);
+    z-index: 50;
+    align-items: center; justify-content: center;
+    padding: 40px;
+    cursor: zoom-out;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img {
+    max-width: 100%; max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+  #lightbox-close {
+    position: absolute; top: 16px; right: 20px;
+    background: rgba(20,21,26,0.8); border: 1px solid #33343c;
+    color: #eceae2; font-size: 22px; line-height: 1;
+    width: 36px; height: 36px; border-radius: 8px;
+    cursor: pointer;
+  }
+  #lightbox-close:hover { background: #33343c; }
 </style>
 </head>
 <body>
 
 <div id="canvas-wrap"></div>
-<div id="loading">Carregando modelo 3D…</div>
-<div id="hint">Arraste para girar · scroll para zoom · clique em uma parte do esqueleto</div>
-<div id="debug-toggle" onclick="toggleDebug()">calibrar (d)</div>
-<div id="debug-readout"></div>
 
-<div id="info-panel">
-  <button id="info-close" onclick="closePanel()">×</button>
-  <p id="info-title"></p>
-  <p id="info-fact"></p>
+<div id="lightbox">
+  <button id="lightbox-close">×</button>
+  <img id="lightbox-img" src="" alt="" />
 </div>
 
-<div id="credit">Modelo: "Male Skeleton" por LeoVitalis (Sketchfab) · CC BY 4.0</div>
+<div id="tabs">
+  <button class="tab-btn active" data-tab="skeleton">Esqueleto</button>
+  <button class="tab-btn" data-tab="muscles">Músculos</button>
+  <button class="tab-btn" data-tab="conteudo">Conteúdo</button>
+</div>
+
+<div id="content-panel">
+  <h2>Conteúdo</h2>
+  <a class="content-link-btn" href="https://youtu.be/eNs2ZCP937Y?is=F_TQ24_JGYb41R0G" target="_blank" rel="noopener noreferrer">
+    <span class="icon">▶</span>
+    <span>Performance da Tate McRae<span class="sub">abre no YouTube</span></span>
+  </a>
+  <a class="content-link-btn" href="./assets/docs/shimmy-simples.pdf" target="_blank" rel="noopener noreferrer">
+    <span class="icon">📄</span>
+    <span>Shimmy Simples<span class="sub">abre o PDF</span></span>
+  </a>
+</div>
+
+<div id="loading">
+  <div id="loading-text">Carregando modelo 3D…</div>
+  <div id="loading-bar-track"><div id="loading-bar-fill"></div></div>
+  <div id="loading-sub"></div>
+</div>
+
+<div id="hint">Arraste para girar · scroll para zoom · clique numa parte do modelo</div>
+<div id="debug-toggle" onclick="window.toggleDebug()">inspetor (d)</div>
+<div id="debug-readout"></div>
+
+<div id="dance-cards"></div>
+
+<div id="layer-widget" class="side-widget">
+  <button id="layer-toggle" class="side-widget-toggle">Camadas (tecido) <span class="side-widget-toggle-icon">▾</span></button>
+  <div id="layer-panel" class="side-widget-panel">
+    <div class="layer-quick-actions">
+      <button data-action="all">mostrar tudo</button>
+      <button data-action="muscles-only">só músculos</button>
+      <button data-action="hide-bones">esconder ossos</button>
+    </div>
+    <div id="layer-checkboxes"></div>
+    <p class="layer-section-title">Grupos musculares</p>
+    <div id="muscle-group-buttons" class="layer-quick-actions"></div>
+  </div>
+</div>
+
+<div id="skeleton-shortcuts-widget" class="side-widget">
+  <button id="skeleton-shortcuts-toggle" class="side-widget-toggle">Atalhos <span class="side-widget-toggle-icon">▾</span></button>
+  <div id="skeleton-shortcuts-panel" class="side-widget-panel">
+    <div id="skeleton-group-buttons" class="layer-quick-actions"></div>
+  </div>
+</div>
+
+<div id="info-panel">
+  <button id="info-close" onclick="window.closePanelUI()">×</button>
+  <p id="info-title"></p>
+  <p id="info-fact"></p>
+  <button id="copy-object-id">copiar Object_ID</button>
+</div>
+
+<div id="credit">
+  Esqueleto: "Male Skeleton" por LeoVitalis (Sketchfab) · CC BY 4.0<br>
+  Músculos: "Myology" por Z-Anatomy (Sketchfab) · CC BY-SA 4.0
+</div>
 
 <script type="importmap">
 {
@@ -99,259 +325,457 @@
 </script>
 
 <script type="module">
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createViewer, openInfoPanel, closeInfoPanel } from './src/sharedViewer.js';
+import {
+  loadSkeleton, pickSkeletonPart, findHitboxesByGroup, getSkeletonGroupInfo
+} from './src/skeletonView.js';
+import {
+  loadMuscles, setLayerVisibility, setAllLayersVisible,
+  highlightMesh, highlightMeshes, clearHighlight, lookupCatalog,
+  findMeshesByGroup, getGroupInfo
+} from './src/muscleView.js';
 
-// ---------- dados das partes: cada uma tem uma faixa vertical (fração da altura total),
-// e um lado ('left', 'right', 'both'). Ajuste os números em CALIBRACAO se necessário.
-const PARTS = [
-  {
-    id: 'quadril', name: 'Quadril (pelve)', side: 'both',
-    yFrom: 0.50, yTo: 0.62,
-    fact: 'A cintura pélvica é formada pela fusão de ílio, ísquio e púbis, unidos ao sacro e ao cóccix — a base que sustenta o tronco e transmite força aos membros inferiores. É o centro de força, equilíbrio e expressão do movimento: no samba de roda e no afro, o jogo de cintura e os isolamentos pélvicos nascem aqui; no ballet, o plié exige rotação externa do quadril; no hip hop e no dancehall, os isolamentos e quebras pélvicas dão ritmo e atitude à dança.'
-  },
-  {
-    id: 'femur-esq', name: 'Fêmur (coxa) — esquerdo', side: 'left',
-    yFrom: 0.30, yTo: 0.50,
-    fact: 'O fêmur é o osso mais longo e mais resistente do corpo humano, movido pelo quadríceps (extensão do joelho) e pelos isquiotibiais (flexão do joelho e extensão do quadril). É a base da força nas pernas: nos battements do ballet, nos saltos e nos power moves do breaking, é a coxa que gera potência, amplitude e impulsão.'
-  },
-  {
-    id: 'femur-dir', name: 'Fêmur (coxa) — direito', side: 'right',
-    yFrom: 0.30, yTo: 0.50,
-    fact: 'O fêmur é o osso mais longo e mais resistente do corpo humano, movido pelo quadríceps (extensão do joelho) e pelos isquiotibiais (flexão do joelho e extensão do quadril). É a base da força nas pernas: nos battements do ballet, nos saltos e nos power moves do breaking, é a coxa que gera potência, amplitude e impulsão.'
-  },
-  {
-    id: 'joelho-esq', name: 'Joelho — esquerdo', side: 'left',
-    yFrom: 0.27, yTo: 0.31,
-    fact: 'O joelho é a maior articulação do corpo, protegido pela patela — o maior osso sesamoide, formado dentro de um tendão. Sua flexão e extensão sustentam o plié do ballet, os giros e os saltos: é aqui que o corpo absorve o impacto e gera o impulso para voos e quedas controladas.'
-  },
-  {
-    id: 'joelho-dir', name: 'Joelho — direito', side: 'right',
-    yFrom: 0.27, yTo: 0.31,
-    fact: 'O joelho é a maior articulação do corpo, protegido pela patela — o maior osso sesamoide, formado dentro de um tendão. Sua flexão e extensão sustentam o plié do ballet, os giros e os saltos: é aqui que o corpo absorve o impacto e gera o impulso para voos e quedas controladas.'
-  },
-  {
-    id: 'perna-esq', name: 'Tíbia e fíbula — esquerda', side: 'left',
-    yFrom: 0.06, yTo: 0.27,
-    fact: 'A tíbia sustenta a maior parte do peso do corpo, enquanto a fíbula, mais fina, estabiliza o tornozelo. Juntas garantem a firmeza e a agilidade dos passos: no frevo, permitem a rapidez das pernas; na catira, resistem às batidas marcadas dos pés; no forró, sustentam a ginga e os deslocamentos laterais.'
-  },
-  {
-    id: 'perna-dir', name: 'Tíbia e fíbula — direita', side: 'right',
-    yFrom: 0.06, yTo: 0.27,
-    fact: 'A tíbia sustenta a maior parte do peso do corpo, enquanto a fíbula, mais fina, estabiliza o tornozelo. Juntas garantem a firmeza e a agilidade dos passos: no frevo, permitem a rapidez das pernas; na catira, resistem às batidas marcadas dos pés; no forró, sustentam a ginga e os deslocamentos laterais.'
-  },
-  {
-    id: 'tornozelo-esq', name: 'Tornozelo — esquerdo', side: 'left',
-    yFrom: 0.03, yTo: 0.065,
-    fact: 'O tornozelo é formado por tíbia, fíbula e tálus, permitindo a flexão dorsal e plantar do pé. É essencial para a fluidez do movimento: no zouk e nas danças de salão, garante ondas e conexão; no ballet, sustenta o trabalho de ponta e a elevação do corpo.'
-  },
-  {
-    id: 'tornozelo-dir', name: 'Tornozelo — direito', side: 'right',
-    yFrom: 0.03, yTo: 0.065,
-    fact: 'O tornozelo é formado por tíbia, fíbula e tálus, permitindo a flexão dorsal e plantar do pé. É essencial para a fluidez do movimento: no zouk e nas danças de salão, garante ondas e conexão; no ballet, sustenta o trabalho de ponta e a elevação do corpo.'
-  },
-  {
-    id: 'pe-esq', name: 'Pé — esquerdo', side: 'left',
-    yFrom: 0.0, yTo: 0.035,
-    fact: 'Cada pé tem 26 ossos — tarso, metatarso e falanges —, somando mais de um quarto de todos os ossos do corpo humano, além de 33 articulações. É a base de apoio, equilíbrio e impulsão da dança: no frevo e na catira, os pés marcam o ritmo com agilidade e precisão; em qualquer estilo, é dali que nasce o salto e o giro.'
-  },
-  {
-    id: 'pe-dir', name: 'Pé — direito', side: 'right',
-    yFrom: 0.0, yTo: 0.035,
-    fact: 'Cada pé tem 26 ossos — tarso, metatarso e falanges —, somando mais de um quarto de todos os ossos do corpo humano, além de 33 articulações. É a base de apoio, equilíbrio e impulsão da dança: no frevo e na catira, os pés marcam o ritmo com agilidade e precisão; em qualquer estilo, é dali que nasce o salto e o giro.'
-  },
-  {
-    id: 'coluna-lombar', name: 'Coluna lombar', side: 'both',
-    yFrom: 0.58, yTo: 0.665,
-    fact: 'A coluna lombar tem 5 vértebras e sustenta a maior parte do peso da parte superior do corpo — por isso é a região mais comum de dores nas costas.'
-  },
-  {
-    id: 'caixa-toracica', name: 'Caixa torácica e coluna torácica', side: 'both',
-    yFrom: 0.665, yTo: 0.83,
-    fact: 'A caixa torácica é formada por 12 pares de costelas presas à coluna torácica e, na maioria dos casos, ao esterno na frente. Ela protege o coração e os pulmões.'
-  },
-  {
-    id: 'mao-esq', name: 'Mão — esquerda', side: 'left',
-    yFrom: 0.47, yTo: 0.545,
-    fact: 'Cada mão tem 27 ossos — mais do que qualquer outra parte do corpo em relação ao tamanho. Isso permite a incrível variedade de movimentos finos que os dedos conseguem fazer.'
-  },
-  {
-    id: 'mao-dir', name: 'Mão — direita', side: 'right',
-    yFrom: 0.47, yTo: 0.545,
-    fact: 'Cada mão tem 27 ossos — mais do que qualquer outra parte do corpo em relação ao tamanho. Isso permite a incrível variedade de movimentos finos que os dedos conseguem fazer.'
-  },
-  {
-    id: 'antebraco-esq', name: 'Antebraço (rádio e ulna) — esquerdo', side: 'left',
-    yFrom: 0.545, yTo: 0.68,
-    fact: 'O antebraço tem dois ossos, rádio e ulna, que giram um sobre o outro — é esse movimento que permite virar a palma da mão pra cima ou pra baixo (pronação e supinação).'
-  },
-  {
-    id: 'antebraco-dir', name: 'Antebraço (rádio e ulna) — direito', side: 'right',
-    yFrom: 0.545, yTo: 0.68,
-    fact: 'O antebraço tem dois ossos, rádio e ulna, que giram um sobre o outro — é esse movimento que permite virar a palma da mão pra cima ou pra baixo (pronação e supinação).'
-  },
-  {
-    id: 'braco-esq', name: 'Braço (úmero) — esquerdo', side: 'left',
-    yFrom: 0.68, yTo: 0.815,
-    fact: 'O úmero é o osso do braço e o terceiro mais longo do corpo. Seu extremo superior encaixa no ombro numa articulação esférica, a mais móvel do corpo humano.'
-  },
-  {
-    id: 'braco-dir', name: 'Braço (úmero) — direito', side: 'right',
-    yFrom: 0.68, yTo: 0.815,
-    fact: 'O úmero é o osso do braço e o terceiro mais longo do corpo. Seu extremo superior encaixa no ombro numa articulação esférica, a mais móvel do corpo humano.'
-  },
-  {
-    id: 'ombros', name: 'Ombros (clavícula e escápula)', side: 'both',
-    yFrom: 0.795, yTo: 0.845,
-    fact: 'A clavícula é o único osso longo do corpo que fica quase na horizontal, e é também o osso mais frequentemente fraturado — comum em quedas ou impactos no ombro.'
-  },
-  {
-    id: 'pescoco', name: 'Pescoço (vértebras cervicais)', side: 'both',
-    yFrom: 0.845, yTo: 0.885,
-    fact: 'O pescoço tem 7 vértebras cervicais — a mesma quantidade que uma girafa tem, só que muito maiores nela. É a região mais móvel da coluna.'
-  },
-  {
-    id: 'cranio', name: 'Crânio', side: 'both',
-    yFrom: 0.885, yTo: 1.0,
-    fact: 'O crânio de um adulto é formado por 22 ossos, a maioria unidos por articulações fixas chamadas suturas. Ao nascer, esses ossos ainda não estão totalmente fundidos, o que permite a passagem pelo canal do parto.'
-  },
+// botões de grupo muscular (aba Músculos) — cada um seleciona/destaca de
+// uma vez todos os Object_ID catalogados com esse `group` em muscleCatalog.js
+const MUSCLE_GROUPS = [
+  { group: 'gluteos', label: 'Glúteos' },
+  { group: 'adutores', label: 'Adutores' },
+  { group: 'quadriceps', label: 'Quadríceps' },
+  { group: 'isquiotibiais', label: 'Isquiotibiais' },
+  { group: 'gastrocnemio', label: 'Gastrocnêmio' },
+  { group: 'tibial-anterior', label: 'Tibial anterior' },
 ];
 
-// ---------- setup básico ----------
+// botões de atalho por região (aba Esqueleto) — como a malha é única, não dá
+// pra "pintar" a região; o atalho abre o painel/cards e leva a câmera até lá.
+const SKELETON_GROUPS = [
+  { group: 'quadril', label: 'Quadril' },
+  { group: 'femur', label: 'Fêmur' },
+  { group: 'joelho', label: 'Joelho' },
+  { group: 'perna', label: 'Tíbia/Fíbula' },
+  { group: 'articulacao-quadril', label: 'Articulação do quadril' },
+  { group: 'tornozelo', label: 'Articulação do pé' },
+];
+
 const wrap = document.getElementById('canvas-wrap');
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x14151a);
+const viewer = createViewer(wrap);
 
-const camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 2000);
-camera.position.set(0, 100, 220);
+// ---------- marcador de seleção (esqueleto) ----------
+// Como o modelo é malha única (não dá pra "pintar" a região clicada), uma
+// círculo pulsante ao redor da parte selecionada serve de feedback visual —
+// tanto pro clique direto quanto pros botões de atalho. Fica sempre de
+// frente pra câmera (billboard), então parece um círculo de qualquer ângulo.
+const selectionMarker = new viewer.THREE.Mesh(
+  new viewer.THREE.RingGeometry(0.93, 1, 64),
+  new viewer.THREE.MeshBasicMaterial({ color: 0x7fd0a8, transparent: true, opacity: 0.5, side: viewer.THREE.DoubleSide, depthTest: false })
+);
+selectionMarker.visible = false;
+selectionMarker.renderOrder = 999;
+viewer.scene.add(selectionMarker);
+let selectionMarkerStart = 0;
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(wrap.clientWidth, wrap.clientHeight);
-wrap.appendChild(renderer.domElement);
+function showSelectionMarker(box) {
+  const sphere = box.getBoundingSphere(new viewer.THREE.Sphere());
+  selectionMarker.position.copy(sphere.center);
+  selectionMarker.userData.baseRadius = Math.max(sphere.radius, 0.001);
+  selectionMarker.visible = true;
+  selectionMarkerStart = performance.now();
+}
+function hideSelectionMarker() {
+  selectionMarker.visible = false;
+}
+(function animateSelectionMarker() {
+  requestAnimationFrame(animateSelectionMarker);
+  if (!selectionMarker.visible || !selectionMarker.userData.baseRadius) return;
+  selectionMarker.quaternion.copy(viewer.camera.quaternion);
+  const t = (performance.now() - selectionMarkerStart) / 1000;
+  const pulse = 1 + Math.sin(t * 3) * 0.08;
+  const r = selectionMarker.userData.baseRadius * pulse;
+  selectionMarker.scale.set(r, r, r);
+  selectionMarker.material.opacity = 0.35 + Math.sin(t * 3) * 0.2;
+})();
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.target.set(0, 60, 0);
+const state = {
+  activeTab: 'skeleton',
+  debug: false,
+  skeleton: null, // { root, hitboxes, box }
+  muscles: null,  // { root, meshes, materialNames }
+  lastObjectId: '',
+};
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-const key = new THREE.DirectionalLight(0xffffff, 1.2);
-key.position.set(100, 200, 150);
-scene.add(key);
-const fill = new THREE.DirectionalLight(0xffffff, 0.5);
-fill.position.set(-100, 50, -150);
-scene.add(fill);
+// ---------- overlay de carregamento ----------
+const loadingEl = document.getElementById('loading');
+const loadingText = document.getElementById('loading-text');
+const loadingSub = document.getElementById('loading-sub');
+const loadingFill = document.getElementById('loading-bar-fill');
 
-window.addEventListener('resize', () => {
-  camera.aspect = wrap.clientWidth / wrap.clientHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
-});
+function showLoading(text, sub) {
+  loadingEl.classList.remove('hidden');
+  loadingText.textContent = text;
+  loadingSub.textContent = sub || '';
+  loadingFill.style.width = '0%';
+}
+function progressHandler(evt) {
+  if (evt && evt.total) {
+    const pct = Math.min(100, Math.round((evt.loaded / evt.total) * 100));
+    loadingFill.style.width = pct + '%';
+    loadingText.textContent = `Carregando… ${pct}%`;
+  }
+}
+function hideLoading() { loadingEl.classList.add('hidden'); }
 
-// ---------- carregar modelo ----------
-const hitboxes = [];
-let debugMode = false;
+// ---------- mini cards "na dança" (um ou mais por parte) ----------
+// Cada part/entry pode ter `cards: [...]`, com dois formatos:
+//  - texto: { label, points: [{ h, t }] } ou { label, text }
+//  - imagem: { type: 'image', label, src, caption }
+const danceCardsEl = document.getElementById('dance-cards');
 
-new GLTFLoader().load('./assets/scene.gltf', (gltf) => {
-  const model = gltf.scene;
+function renderDanceCards(cards) {
+  danceCardsEl.innerHTML = '';
+  if (!cards || !cards.length) return;
 
-  // material neutro tipo osso, funciona sem texturas
-  model.traverse(o => {
-    if (o.isMesh) {
-      o.material = new THREE.MeshStandardMaterial({
-        color: 0xe8e2d0, roughness: 0.85, metalness: 0.05
+  cards.forEach((card) => {
+    const el = document.createElement('div');
+    el.className = card.type === 'image' ? 'dance-image-card' : 'dance-card';
+
+    const label = document.createElement('p');
+    label.className = card.type === 'image' ? 'dance-image-label' : 'dance-card-label';
+    label.textContent = card.label || 'Na dança';
+    el.appendChild(label);
+
+    if (card.type === 'image') {
+      const img = document.createElement('img');
+      img.src = card.src;
+      img.alt = card.caption || '';
+      img.addEventListener('click', () => openLightbox(card.src, card.caption));
+      el.appendChild(img);
+      if (card.caption) {
+        const cap = document.createElement('p');
+        cap.className = 'dance-image-caption';
+        cap.textContent = card.caption;
+        el.appendChild(cap);
+      }
+    } else if (card.points && card.points.length) {
+      card.points.forEach((pt) => {
+        const p = document.createElement('p');
+        p.className = 'dance-card-text';
+        if (pt.h) {
+          const strong = document.createElement('strong');
+          strong.textContent = pt.h + ': ';
+          p.appendChild(strong);
+        }
+        p.appendChild(document.createTextNode(pt.t));
+        el.appendChild(p);
       });
+    } else if (card.text) {
+      const p = document.createElement('p');
+      p.className = 'dance-card-text';
+      p.textContent = card.text;
+      el.appendChild(p);
     }
+
+    danceCardsEl.appendChild(el);
   });
+}
+function hideDanceCards() {
+  danceCardsEl.innerHTML = '';
+}
 
-  scene.add(model);
+// ---------- lightbox (clique numa imagem de card pra ampliar) ----------
+const lightboxEl = document.getElementById('lightbox');
+const lightboxImgEl = document.getElementById('lightbox-img');
 
-  const box = new THREE.Box3().setFromObject(model);
-  const minY = box.min.y, maxY = box.max.y, height = maxY - minY;
-  const minX = box.min.x, maxX = box.max.x, cx = (minX + maxX) / 2;
-  const minZ = box.min.z, maxZ = box.max.z;
-
-  // centraliza câmera no corpo inteiro
-  const midY = minY + height * 0.5;
-  controls.target.set(cx, midY, 0);
-  camera.position.set(cx + 10, midY + 20, height * 1.15);
-
-  // cria hitboxes invisíveis
-  const helperMat = new THREE.MeshBasicMaterial({
-    color: 0x7fd0a8, transparent: true, opacity: 0, wireframe: false
-  });
-
-  PARTS.forEach(part => {
-    const yFrom = minY + height * part.yFrom;
-    const yTo = minY + height * part.yFrom + (height * (part.yTo - part.yFrom));
-    let xFrom = minX, xTo = maxX;
-    if (part.side === 'left') { xFrom = cx; xTo = maxX; }
-    if (part.side === 'right') { xFrom = minX; xTo = cx; }
-
-    const w = xTo - xFrom;
-    const h = yTo - yFrom;
-    const d = (maxZ - minZ) * 1.4;
-
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, helperMat.clone());
-    mesh.position.set(xFrom + w / 2, yFrom + h / 2, (minZ + maxZ) / 2);
-    mesh.userData.part = part;
-    scene.add(mesh);
-    hitboxes.push(mesh);
-  });
-
-  document.getElementById('loading').style.display = 'none';
-}, undefined, (err) => {
-  document.getElementById('loading').textContent = 'Erro ao carregar o modelo — veja o console.';
-  console.error(err);
+function openLightbox(src, alt) {
+  lightboxImgEl.src = src;
+  lightboxImgEl.alt = alt || '';
+  lightboxEl.classList.add('open');
+}
+function closeLightbox() {
+  lightboxEl.classList.remove('open');
+}
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+lightboxEl.addEventListener('click', (e) => {
+  if (e.target === lightboxEl) closeLightbox();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && lightboxEl.classList.contains('open')) closeLightbox();
 });
 
-// ---------- interação por clique ----------
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+// ---------- carregamento com lazy load + cache ----------
+async function ensureSkeletonLoaded() {
+  if (state.skeleton) return state.skeleton;
+  showLoading('Carregando esqueleto…', '');
+  state.skeleton = await loadSkeleton(viewer.scene, progressHandler);
+  buildSkeletonShortcuts();
+  hideLoading();
+  return state.skeleton;
+}
 
-renderer.domElement.addEventListener('click', (e) => {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+async function ensureMusclesLoaded() {
+  if (state.muscles) return state.muscles;
+  showLoading('Carregando músculos…', 'Modelo pesado (~150MB) — isso pode levar um tempo na primeira vez. Depois fica em cache.');
+  state.muscles = await loadMuscles(viewer.scene, progressHandler);
+  buildLayerFilters(state.muscles.materialNames);
+  buildMuscleGroupButtons();
+  hideLoading();
+  return state.muscles;
+}
 
-  raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects(hitboxes, false);
+// ---------- alternância de abas ----------
+function setVisible(which) {
+  if (state.skeleton) {
+    state.skeleton.root.visible = which === 'skeleton';
+    state.skeleton.hitboxes.forEach((h) => { h.visible = which === 'skeleton'; });
+  }
+  if (state.muscles) {
+    state.muscles.root.visible = which === 'muscles';
+  }
+  document.getElementById('layer-widget').style.display = which === 'muscles' && state.muscles ? 'block' : 'none';
+  document.getElementById('skeleton-shortcuts-widget').style.display = which === 'skeleton' && state.skeleton ? 'block' : 'none';
+}
 
-  if (debugMode && hits.length) {
-    const p = hits[0].point;
-    document.getElementById('debug-readout').textContent =
-      `x: ${p.x.toFixed(1)}\ny: ${p.y.toFixed(1)}\nz: ${p.z.toFixed(1)}`;
+async function activateTab(tab) {
+  state.activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  closeInfoPanel();
+  hideDanceCards();
+  clearHighlight();
+  hideSelectionMarker();
+  document.getElementById('debug-readout').textContent = '';
+  document.getElementById('copy-object-id').style.display = 'none';
+  document.getElementById('content-panel').style.display = tab === 'conteudo' ? 'flex' : 'none';
+  document.getElementById('hint').style.display = tab === 'conteudo' ? 'none' : 'block';
+
+  if (tab === 'skeleton') {
+    const s = await ensureSkeletonLoaded();
+    setVisible('skeleton');
+    viewer.frameOnObject(s.root, { targetHeightFrac: 0.3, cameraHeightFrac: 0.35, distanceMul: 1.3 });
+  } else if (tab === 'muscles') {
+    const m = await ensureMusclesLoaded();
+    setVisible('muscles');
+    viewer.frameOnObject(m.root, { targetHeightFrac: 0.5, cameraHeightFrac: 0.55, distanceMul: 1.5 });
+  } else {
+    // aba "Conteúdo" — sem modelo 3D, só o painel de links
+    setVisible(null);
+  }
+}
+
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+});
+
+// ---------- clique / raycaster ----------
+viewer.renderer.domElement.addEventListener('click', (e) => {
+  if (state.activeTab === 'skeleton' && state.skeleton) {
+    const hits = viewer.pickAt(e.clientX, e.clientY, state.skeleton.hitboxes);
+    if (state.debug) {
+      if (hits.length) {
+        const p = hits[0].point;
+        document.getElementById('debug-readout').textContent =
+          `x: ${p.x.toFixed(1)}\ny: ${p.y.toFixed(1)}\nz: ${p.z.toFixed(1)}`;
+      }
+      return;
+    }
+    const part = pickSkeletonPart(hits);
+    if (part) {
+      openInfoPanel(part.name, part.fact);
+      renderDanceCards(part.cards);
+      showSelectionMarker(new viewer.THREE.Box3().setFromObject(hits[0].object));
+    } else {
+      // clicou fora de qualquer parte: fecha painel e cards
+      closeInfoPanel();
+      hideDanceCards();
+      hideSelectionMarker();
+    }
     return;
   }
 
-  if (hits.length) {
-    const part = hits[0].object.userData.part;
-    openPanel(part.name, part.fact);
+  if (state.activeTab === 'muscles' && state.muscles) {
+    const hits = viewer.pickAt(e.clientX, e.clientY, state.muscles.meshes);
+    if (!hits.length) {
+      closeInfoPanel();
+      hideDanceCards();
+      clearHighlight();
+      return;
+    }
+    const mesh = hits[0].object;
+    highlightMesh(mesh);
+    state.lastObjectId = mesh.name;
+
+    if (state.debug) {
+      const p = hits[0].point;
+      document.getElementById('debug-readout').textContent =
+        `objeto: ${mesh.name}\nmaterial: ${mesh.userData.materialName}\nx: ${p.x.toFixed(3)}  y: ${p.y.toFixed(3)}  z: ${p.z.toFixed(3)}`;
+      document.getElementById('copy-object-id').style.display = 'inline-block';
+      return;
+    }
+
+    const entry = lookupCatalog(mesh);
+    if (entry) {
+      openInfoPanel(entry.name, entry.fact);
+      renderDanceCards(entry.cards);
+    } else {
+      hideDanceCards();
+      openInfoPanel(
+        `Estrutura não identificada (${mesh.name})`,
+        `Tecido: ${mesh.userData.materialName}. Esse objeto ainda não foi catalogado — ative o modo inspetor pra identificar e adicione a entrada em src/muscleCatalog.js.`
+      );
+    }
   }
 });
 
-function openPanel(title, fact) {
-  document.getElementById('info-title').textContent = title;
-  document.getElementById('info-fact').textContent = fact;
-  document.getElementById('info-panel').classList.add('open');
-}
-window.closePanel = () => document.getElementById('info-panel').classList.remove('open');
-
-window.toggleDebug = () => {
-  debugMode = !debugMode;
-  document.getElementById('debug-readout').style.display = debugMode ? 'block' : 'none';
+// ---------- modo inspetor ----------
+window.toggleDebug = function toggleDebug() {
+  state.debug = !state.debug;
+  document.getElementById('debug-readout').style.display = state.debug ? 'block' : 'none';
+  document.getElementById('debug-toggle').classList.toggle('active', state.debug);
+  if (!state.debug) document.getElementById('copy-object-id').style.display = 'none';
 };
 window.addEventListener('keydown', (e) => { if (e.key === 'd') window.toggleDebug(); });
 
-// ---------- loop ----------
-function animate() {
-  requestAnimationFrame(animate);
-  controls.update();
-  renderer.render(scene, camera);
+document.getElementById('copy-object-id').addEventListener('click', () => {
+  if (state.lastObjectId) navigator.clipboard.writeText(state.lastObjectId);
+});
+
+window.closePanelUI = () => { closeInfoPanel(); hideDanceCards(); clearHighlight(); hideSelectionMarker(); };
+
+// ---------- filtro de camadas (aba músculos) ----------
+function buildLayerFilters(materialNames) {
+  const container = document.getElementById('layer-checkboxes');
+  container.innerHTML = '';
+  materialNames.forEach((name) => {
+    const label = document.createElement('label');
+    label.className = 'layer-check';
+    label.innerHTML = `<input type="checkbox" checked /> ${name}`;
+    const input = label.querySelector('input');
+    input.dataset.material = name;
+    input.addEventListener('change', (e) => {
+      setLayerVisibility(state.muscles.meshes, name, e.target.checked);
+    });
+    container.appendChild(label);
+  });
 }
-animate();
+
+// mostrar/ocultar o painel de camadas fica a critério do usuário — a
+// escolha é lembrada entre sessões via localStorage.
+const layerToggleBtn = document.getElementById('layer-toggle');
+const layerPanelEl = document.getElementById('layer-panel');
+let layersOpen = true;
+try { layersOpen = localStorage.getItem('layerPanelOpen') !== 'false'; } catch (err) {}
+
+function applyLayerPanelState() {
+  layerPanelEl.classList.toggle('collapsed', !layersOpen);
+  layerToggleBtn.classList.toggle('collapsed', !layersOpen);
+}
+applyLayerPanelState();
+
+layerToggleBtn.addEventListener('click', () => {
+  layersOpen = !layersOpen;
+  applyLayerPanelState();
+  try { localStorage.setItem('layerPanelOpen', String(layersOpen)); } catch (err) {}
+});
+
+function syncCheckboxes(visibleMaterials) {
+  document.querySelectorAll('#layer-checkboxes input').forEach((input) => {
+    input.checked = visibleMaterials.has(input.dataset.material);
+  });
+}
+
+document.querySelectorAll('.layer-quick-actions button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (!state.muscles) return;
+    const action = btn.dataset.action;
+    if (action === 'all') {
+      setAllLayersVisible(state.muscles.meshes, true);
+      syncCheckboxes(new Set(state.muscles.materialNames));
+    } else if (action === 'muscles-only') {
+      setAllLayersVisible(state.muscles.meshes, false);
+      setLayerVisibility(state.muscles.meshes, 'Muscles.001', true);
+      syncCheckboxes(new Set(['Muscles.001']));
+    } else if (action === 'hide-bones') {
+      setLayerVisibility(state.muscles.meshes, 'Bone', false);
+      const visible = new Set(state.muscles.materialNames.filter((n) => n !== 'Bone'));
+      syncCheckboxes(visible);
+    }
+  });
+});
+
+// ---------- botões de grupo muscular (aba músculos) ----------
+function buildMuscleGroupButtons() {
+  const container = document.getElementById('muscle-group-buttons');
+  container.innerHTML = '';
+  MUSCLE_GROUPS.forEach(({ group, label }) => {
+    const matches = findMeshesByGroup(state.muscles.meshes, group);
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    if (!matches.length) btn.classList.add('empty');
+    btn.addEventListener('click', () => selectMuscleGroup(group, label));
+    container.appendChild(btn);
+  });
+}
+
+function selectMuscleGroup(group, label) {
+  const matches = findMeshesByGroup(state.muscles.meshes, group);
+  if (!matches.length) {
+    openInfoPanel(label, 'Nenhum objeto desse grupo foi catalogado ainda — use o modo inspetor pra identificar os Object_ID e adicione o `group` correspondente em src/muscleCatalog.js.');
+    hideDanceCards();
+    return;
+  }
+  highlightMeshes(matches);
+  const info = getGroupInfo(group);
+  openInfoPanel(label, info?.fact || '');
+  renderDanceCards(info?.cards);
+}
+
+// ---------- botões de atalho por região (aba esqueleto) ----------
+function buildSkeletonShortcuts() {
+  const container = document.getElementById('skeleton-group-buttons');
+  container.innerHTML = '';
+  SKELETON_GROUPS.forEach(({ group, label }) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.addEventListener('click', () => selectSkeletonGroup(group));
+    container.appendChild(btn);
+  });
+}
+
+function selectSkeletonGroup(group) {
+  const matches = findHitboxesByGroup(state.skeleton.hitboxes, group);
+  if (!matches.length) return;
+
+  const box = new viewer.THREE.Box3();
+  matches.forEach((h) => box.union(new viewer.THREE.Box3().setFromObject(h)));
+  viewer.frameOnBox(box, { targetHeightFrac: 0.5, cameraHeightFrac: 0.5, distanceMul: 2.2 });
+  showSelectionMarker(box);
+
+  const info = getSkeletonGroupInfo(group);
+  if (info) {
+    openInfoPanel(info.name, info.fact);
+    renderDanceCards(info.cards);
+  }
+}
+
+// mostrar/ocultar o painel de atalhos — mesma lógica do painel de camadas,
+// com preferência salva à parte.
+const skeletonShortcutsToggleBtn = document.getElementById('skeleton-shortcuts-toggle');
+const skeletonShortcutsPanelEl = document.getElementById('skeleton-shortcuts-panel');
+let skeletonShortcutsOpen = true;
+try { skeletonShortcutsOpen = localStorage.getItem('skeletonShortcutsOpen') !== 'false'; } catch (err) {}
+
+function applySkeletonShortcutsState() {
+  skeletonShortcutsPanelEl.classList.toggle('collapsed', !skeletonShortcutsOpen);
+  skeletonShortcutsToggleBtn.classList.toggle('collapsed', !skeletonShortcutsOpen);
+}
+applySkeletonShortcutsState();
+
+skeletonShortcutsToggleBtn.addEventListener('click', () => {
+  skeletonShortcutsOpen = !skeletonShortcutsOpen;
+  applySkeletonShortcutsState();
+  try { localStorage.setItem('skeletonShortcutsOpen', String(skeletonShortcutsOpen)); } catch (err) {}
+});
+
+// ---------- estado inicial: aba Esqueleto carrega de cara ----------
+activateTab('skeleton');
 </script>
 </body>
 </html>

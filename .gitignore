@@ -5,3 +5,8 @@ myology (*)/
 miology/
 miology (*)/
 **/miology/
+
+# arquivos pesados do modelo de músculos usado em assets/muscles/
+# (154MB — acima do limite de 100MB do GitHub; mantenha license.txt versionado)
+assets/muscles/scene.bin
+assets/muscles/scene.gltf
