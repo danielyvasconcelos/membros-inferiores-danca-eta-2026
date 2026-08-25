@@ -46,7 +46,13 @@ export function createViewer(wrap) {
 
   // Enquadra a câmera num objeto qualquer, independente da escala (cm ou metros).
   function frameOnObject(object3D, opts = {}) {
-    const box = new THREE.Box3().setFromObject(object3D);
+    return frameOnBox(new THREE.Box3().setFromObject(object3D), opts);
+  }
+
+  // Igual a frameOnObject, mas recebe uma THREE.Box3 já pronta — útil pra
+  // enquadrar a união de vários objetos (ex.: hitboxes esquerda + direita)
+  // sem precisar reparentar nada.
+  function frameOnBox(box, opts = {}) {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const radius = Math.max(size.x, size.y, size.z) || 1;
@@ -75,7 +81,7 @@ export function createViewer(wrap) {
   }
   animate();
 
-  return { THREE, scene, camera, renderer, controls, raycaster, pickAt, frameOnObject };
+  return { THREE, scene, camera, renderer, controls, raycaster, pickAt, frameOnObject, frameOnBox };
 }
 
 // ---------- painel de informação (compartilhado pelas duas abas) ----------

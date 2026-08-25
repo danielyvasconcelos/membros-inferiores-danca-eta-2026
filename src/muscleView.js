@@ -69,27 +69,42 @@ export function setAllLayersVisible(meshes, visible) {
   meshes.forEach((m) => { m.visible = visible; });
 }
 
-let highlighted = null;
-let highlightOriginalHex = 0x000000;
+// Destaque suporta um mesh só (clique normal) ou vários de uma vez
+// (botão de grupo muscular, ex.: "Quadríceps" seleciona todos os objetos
+// daquele grupo ao mesmo tempo).
+let highlighted = []; // [{ mesh, originalHex }]
+
+export function highlightMeshes(meshList) {
+  clearHighlight();
+  highlighted = meshList
+    .filter((m) => m?.material?.emissive)
+    .map((mesh) => {
+      const originalHex = mesh.material.emissive.getHex();
+      mesh.material.emissive.setHex(0x2f6f4f);
+      return { mesh, originalHex };
+    });
+}
 
 export function highlightMesh(mesh) {
-  if (highlighted && highlighted !== mesh && highlighted.material?.emissive) {
-    highlighted.material.emissive.setHex(highlightOriginalHex);
-  }
-  if (mesh?.material?.emissive) {
-    if (highlighted !== mesh) highlightOriginalHex = mesh.material.emissive.getHex();
-    mesh.material.emissive.setHex(0x2f6f4f);
-  }
-  highlighted = mesh;
+  highlightMeshes(mesh ? [mesh] : []);
 }
 
 export function clearHighlight() {
-  if (highlighted?.material?.emissive) {
-    highlighted.material.emissive.setHex(highlightOriginalHex);
-  }
-  highlighted = null;
+  highlighted.forEach(({ mesh, originalHex }) => {
+    mesh.material.emissive.setHex(originalHex);
+  });
+  highlighted = [];
 }
 
 export function lookupCatalog(mesh) {
   return MUSCLE_CATALOG[mesh.name] || null;
+}
+
+export function findMeshesByGroup(meshes, group) {
+  return meshes.filter((m) => MUSCLE_CATALOG[m.name]?.group === group);
+}
+
+export function getGroupInfo(group) {
+  const entry = Object.values(MUSCLE_CATALOG).find((e) => e.group === group);
+  return entry ? { fact: entry.fact, cards: entry.cards } : null;
 }
